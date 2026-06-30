@@ -138,17 +138,19 @@ def get_slots():
 
     next_monday, next_sunday = get_next_week_range()
 
-    # 只在周五及之后放出号源
+    # 只在周五及之后放出号源（医生 token 可随时预览）
     if today.weekday() < 4:
-        # 本周五是哪天
-        days_to_friday = 4 - today.weekday()
-        friday = today + timedelta(days=days_to_friday)
-        return jsonify({
-            'open': False,
-            'message': f'下周日源将于 {friday.month}月{friday.day}日（周五）开放',
-            'next_monday': next_monday.isoformat(),
-            'next_sunday': next_sunday.isoformat(),
-        })
+        t = request.args.get('t', '').strip()
+        if t != DOCTOR_TOKEN:
+            # 本周五是哪天
+            days_to_friday = 4 - today.weekday()
+            friday = today + timedelta(days=days_to_friday)
+            return jsonify({
+                'open': False,
+                'message': f'下周日源将于 {friday.month}月{friday.day}日（周五）开放',
+                'next_monday': next_monday.isoformat(),
+                'next_sunday': next_sunday.isoformat(),
+            })
 
     bookings = load_bookings()
 
