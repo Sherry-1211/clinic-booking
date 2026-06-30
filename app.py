@@ -95,29 +95,56 @@ def verify_doctor_token():
     return False
 
 
-def get_next_week_range():
-    """返回下周一到下周日的日期范围。"""
-    today = date.today()
-    days_until_monday = (7 - today.weekday()) % 7
-    if days_until_monday == 0:
-        days_until_monday = 7  # 今天就是周一，跳到下周一
-    next_monday = today + timedelta(days=days_until_monday)
-    next_sunday = next_monday + timedelta(days=6)
-    return next_monday, next_sunday
+# 首次释放日：2026年7月3日（周五）
+FIRST_RELEASE = date(2026, 7, 3)
 
 
 def get_booking_window():
-    """返回可预约的日期范围：下周一到下下周日。"""
-    next_monday, next_sunday = get_next_week_range()
-    window_end = next_sunday + timedelta(days=7)
-    return next_monday, window_end
+    """
+    返回可预约的日期范围（含起止）。
+    规则：每过一个周五自动释放 1 个新周，始终显示最近 2 个未过期周。
+    本周五 → 下周；下周五 → 下周+下下周；以此类推。
+    测试模式下始终返回 2 周（从最近一个周五后的周一开始）。
+    """
+    today = date.today()
+
+    # 找到最近的一个周五（含今天）
+    days_since_friday = (today.weekday() - 4) % 7
+    most_recent_friday = today - timedelta(days=days_since_friday)
+
+    # 统计从首次释放日到现在过了几个周五
+    num_weeks = 0
+    cur = FIRST_RELEASE
+    while cur <= most_recent_friday:
+        num_weeks += 1
+        cur += timedelta(days=7)
+    num_weeks = min(num_weeks, 2)  # 最多 2 周
+
+    if TEST_MODE:
+        num_weeks = 2  # 测试模式始终显示 2 周
+
+    if num_weeks == 0:
+        return None, None  # 尚未到任何释放日
+
+    # 窗口从最近一个周五所在周的下周一开始
+    friday_week_monday = most_recent_friday - timedelta(days=most_recent_friday.weekday())
+    window_start = friday_week_monday + timedelta(days=7)
+    window_end = window_start + timedelta(days=7 * num_weeks - 1)
+
+    return window_start, window_end
 
 
 def _check_booking_open():
-    """检查当前是否在预约开放时段（周五及之后）。返回 (ok, err_msg)。"""
+    """检查当前是否在预约开放时段。返回 (ok, err_msg)。"""
     if TEST_MODE:
         return True, ''
     today = date.today()
+    if today < FIRST_RELEASE:
+        days_to_friday = (4 - today.weekday()) % 7
+        if days_to_friday == 0:
+            days_to_friday = 7
+        friday = today + timedelta(days=days_to_friday)
+        return False, f'号源将于 {friday.month}月{friday.day}日（周五）首次开放'
     if today.weekday() < 4:
         days_to_friday = 4 - today.weekday()
         friday = today + timedelta(days=days_to_friday)
@@ -146,21 +173,30 @@ def get_slots():
     now = datetime.now()
     today_str = today.isoformat()
 
-    next_monday, next_sunday = get_next_week_range()
     window_start, window_end = get_booking_window()
+
+    # 尚未到任何释放日 → 预告首次释放日
+    if window_start is None:
+        days_to_friday = (4 - today.weekday()) % 7
+        if days_to_friday == 0:
+            days_to_friday = 7  # 今天就是周五但 num_weeks=0？不应该发生，兜底
+        friday = today + timedelta(days=days_to_friday)
+        return jsonify({
+            'open': False,
+            'message': f'号源将于 {friday.month}月{friday.day}日（周五）首次开放',
+        })
 
     # 只在周五及之后放出号源（医生 token / 测试模式可随时预览）
     if not TEST_MODE and today.weekday() < 4:
         t = request.args.get('t', '').strip()
         if t != DOCTOR_TOKEN:
-            # 本周五是哪天
             days_to_friday = 4 - today.weekday()
             friday = today + timedelta(days=days_to_friday)
             return jsonify({
                 'open': False,
                 'message': f'下周日源将于 {friday.month}月{friday.day}日（周五）开放',
-                'next_monday': next_monday.isoformat(),
-                'next_sunday': next_sunday.isoformat(),
+                'window_start': window_start.isoformat(),
+                'window_end': window_end.isoformat(),
             })
 
     bookings = load_bookings()
@@ -225,6 +261,8 @@ def lock_slot():
     except ValueError:
         return jsonify({'ok': False, 'error': '无效的日期'}), 400
     win_start, win_end = get_booking_window()
+    if win_start is None:
+        return jsonify({'ok': False, 'error': '预约尚未开放'}), 403
     if target_date < win_start or target_date > win_end:
         return jsonify({
             'ok': False,
