@@ -94,6 +94,17 @@ def verify_doctor_token():
     return False
 
 
+def get_next_week_range():
+    """返回下周一到下周日的日期范围。"""
+    today = date.today()
+    days_until_monday = (7 - today.weekday()) % 7
+    if days_until_monday == 0:
+        days_until_monday = 7  # 今天就是周一，跳到下周一
+    next_monday = today + timedelta(days=days_until_monday)
+    next_sunday = next_monday + timedelta(days=6)
+    return next_monday, next_sunday
+
+
 # ── 页面路由 ──
 
 @app.route('/')
@@ -115,9 +126,11 @@ def get_slots():
     now = datetime.now()
     bookings = load_bookings()
 
+    next_monday, next_sunday = get_next_week_range()
+
     result = {}
-    current = date.today()
-    for _ in range(14):
+    current = next_monday
+    while current <= next_sunday:
         day = current.isoformat()
         slots = []
         for ts in TIME_SLOTS:
