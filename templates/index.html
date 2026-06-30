@@ -1,0 +1,888 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>张医生 · 小区义诊预约</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin:0; padding:0; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', sans-serif;
+  background: #f5f5f7;
+  color: #1d1d1f;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  min-height: 100vh;
+}
+.container { max-width: 480px; margin:0 auto; padding: 16px; }
+
+.doctor-card {
+  background: #fff;
+  border-radius: 18px;
+  padding: 18px 16px;
+  margin-bottom: 14px;
+  border: 1px solid #e5e5ea;
+}
+.doctor-header { display: flex; align-items: center; gap: 14px; margin-bottom: 12px; }
+.doctor-avatar {
+  width: 56px; height: 56px; border-radius: 50%;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 22px; color: #fff; flex-shrink: 0;
+}
+.doctor-name { font-size: 18px; font-weight: 600; }
+.doctor-tag {
+  display: inline-block; background: #e8f4fd; color: #0071e3;
+  font-size: 11px; padding: 2px 8px; border-radius: 20px; margin-top: 3px;
+}
+.doctor-skills {
+  font-size: 13px; color: #3a3a3c; line-height: 1.7;
+  padding-top: 10px; border-top: 1px solid #f0f0f5;
+}
+.doctor-skills strong { color: #1d1d1f; }
+
+.notice-box {
+  background: #fff9ec;
+  border-left: 3px solid #f0a500;
+  border-radius: 0 10px 10px 0;
+  padding: 12px 14px;
+  margin-bottom: 14px;
+  font-size: 13px;
+  color: #5a4000;
+  line-height: 1.7;
+}
+.cancel-notice {
+  background: #f0f5ff; border-left: 3px solid #0071e3;
+  border-radius: 0 10px 10px 0; padding: 9px 12px;
+  margin-bottom: 12px; font-size: 12px; color: #0071e3; line-height: 1.6;
+}
+.notice-box .notice-title { font-weight: 600; margin-bottom: 4px; font-size: 13px; }
+
+.date-bar {
+  display: flex; gap: 8px; overflow-x: auto; padding: 4px 0 14px;
+  -webkit-overflow-scrolling: touch; scrollbar-width: none;
+}
+.date-bar::-webkit-scrollbar { display: none; }
+.date-chip {
+  flex-shrink: 0; min-width: 58px; padding: 9px 10px;
+  border-radius: 12px; text-align: center; cursor: pointer;
+  background: #fff; border: 1px solid #e5e5ea; font-size: 13px;
+  -webkit-tap-highlight-color: transparent; user-select: none;
+}
+.date-chip:active { transform: scale(0.95); }
+.date-chip .dow { font-size: 11px; color: #86868b; margin-bottom: 2px; }
+.date-chip .dd { font-size: 15px; font-weight: 600; }
+.date-chip.active { background: #0071e3; border-color: #0071e3; color: #fff; }
+.date-chip.active .dow { color: rgba(255,255,255,0.7); }
+
+.section-label {
+  font-size: 12px; color: #86868b; margin-bottom: 10px; font-weight: 500;
+  display: flex; justify-content: space-between; align-items: center;
+}
+.legend { display: flex; gap: 12px; }
+.legend span { display: flex; align-items: center; gap: 4px; font-size: 11px; }
+.legend .ld { width: 7px; height: 7px; border-radius: 50%; }
+
+.slot-list { display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px; }
+.slot-card {
+  background: #fff; border: 1px solid #e5e5ea; border-radius: 14px;
+  padding: 16px; display: flex; align-items: center; justify-content: space-between;
+  cursor: pointer; -webkit-tap-highlight-color: transparent; user-select: none;
+  transition: background .1s;
+}
+.slot-card:active:not(.booked):not(.expired) { background: #f0f5ff; }
+.slot-card .slot-left { display: flex; align-items: center; gap: 12px; }
+.slot-icon {
+  width: 40px; height: 40px; border-radius: 10px;
+  display: flex; align-items: center; justify-content: center; font-size: 18px;
+  flex-shrink: 0;
+}
+.slot-time { font-size: 15px; font-weight: 600; }
+.slot-sub { font-size: 12px; margin-top: 2px; }
+.slot-card.available .slot-icon { background: #e8f8ee; }
+.slot-card.available .slot-sub { color: #34c759; }
+.slot-card.booked .slot-icon { background: #fff0f0; }
+.slot-card.booked .slot-sub { color: #ff3b30; }
+.slot-card.expired .slot-icon { background: #f5f5f7; }
+.slot-card.expired { opacity: 0.5; cursor: default; }
+.slot-card.booked { cursor: default; }
+.slot-badge {
+  font-size: 12px; padding: 5px 12px; border-radius: 20px; font-weight: 500;
+}
+.slot-card.available .slot-badge { background: #e8f8ee; color: #34c759; }
+.slot-card.booked .slot-badge { background: #fff0f0; color: #ff3b30; }
+.slot-card.expired .slot-badge { background: #f5f5f7; color: #c7c7cc; }
+
+/* 弹窗通用 */
+.modal-overlay {
+  position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.45); z-index: 100;
+  display: flex; align-items: flex-end; justify-content: center;
+}
+.modal {
+  background: #fff; border-radius: 22px 22px 0 0; padding: 20px 18px 36px;
+  width: 100%; max-width: 480px; max-height: 88vh; overflow-y: auto;
+}
+.modal-handle { width: 36px; height: 4px; background: #e0e0e5; border-radius: 2px; margin: 0 auto 16px; }
+.modal h3 { font-size: 17px; font-weight: 600; margin-bottom: 4px; }
+.modal .modal-sub { font-size: 13px; color: #0071e3; margin-bottom: 18px; }
+
+.form-section { margin-bottom: 18px; }
+.form-section-title {
+  font-size: 12px; font-weight: 600; color: #86868b; text-transform: uppercase;
+  letter-spacing: 0.05em; margin-bottom: 10px;
+}
+.input-group { margin-bottom: 12px; }
+.input-group label {
+  display: block; font-size: 13px; font-weight: 500; margin-bottom: 6px; color: #1d1d1f;
+}
+.input-group label .required { color: #ff3b30; margin-left: 2px; }
+.input-group label .optional { color: #86868b; font-weight: 400; font-size: 12px; margin-left: 4px; }
+.input-group input, .input-group textarea, .input-group select {
+  width: 100%; padding: 12px 14px; border: 1px solid #e5e5ea; border-radius: 12px;
+  font-size: 15px; font-family: inherit; outline: none; transition: border .15s;
+  -webkit-appearance: none; background: #fff; color: #1d1d1f;
+}
+.input-group input:focus, .input-group textarea:focus, .input-group select:focus { border-color: #0071e3; }
+.input-group textarea { resize: none; height: 80px; }
+.radio-group { display: flex; gap: 8px; }
+.radio-btn {
+  flex: 1; padding: 10px 0; border: 1px solid #e5e5ea; border-radius: 10px;
+  text-align: center; font-size: 14px; cursor: pointer;
+  -webkit-tap-highlight-color: transparent; transition: all .15s;
+}
+.radio-btn.selected { border-color: #0071e3; background: #e8f4fd; color: #0071e3; font-weight: 500; }
+
+.lock-success-msg { text-align: center; padding: 16px 0; }
+.lock-success-msg .ls-icon {
+  width: 56px; height: 56px; border-radius: 50%;
+  background: #e8f8ee; display: flex; align-items: center; justify-content: center;
+  font-size: 24px; margin: 0 auto 14px;
+}
+.lock-success-msg p { font-size: 14px; color: #86868b; margin-bottom: 18px; line-height: 1.6; }
+
+.btn {
+  width: 100%; padding: 14px; border: none; border-radius: 14px;
+  font-size: 16px; font-weight: 600; cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.btn-primary { background: #0071e3; color: #fff; }
+.btn-primary:active { background: #005ec0; }
+.btn-primary:disabled { background: #b0d4f1; }
+.btn-secondary {
+  background: transparent; color: #0071e3; margin-top: 10px;
+  font-weight: 500; font-size: 15px;
+}
+
+.success-screen { text-align: center; padding: 12px 0 8px; }
+.success-icon {
+  width: 64px; height: 64px; border-radius: 50%;
+  background: #e8f8ee; display: flex; align-items: center; justify-content: center;
+  font-size: 28px; margin: 0 auto 14px;
+}
+.success-screen h3 { font-size: 18px; font-weight: 600; margin-bottom: 6px; }
+.success-screen .success-sub { font-size: 14px; color: #86868b; margin-bottom: 18px; line-height: 1.6; }
+.booking-confirm-card {
+  background: #f5f5f7; border-radius: 12px; padding: 14px 16px;
+  text-align: left; margin-bottom: 20px; font-size: 13px;
+}
+.booking-confirm-card .row { display: flex; justify-content: space-between; padding: 5px 0; }
+.booking-confirm-card .row:not(:last-child) { border-bottom: 1px solid #e5e5ea; }
+.booking-confirm-card .row .label { color: #86868b; }
+.booking-confirm-card .row .val { font-weight: 500; color: #1d1d1f; }
+
+/* 医生管理内嵌样式 */
+.doctor-panel-wrap { padding-bottom: 16px; }
+.dp-day-group { margin-bottom: 20px; }
+.dp-day-label {
+  font-size: 15px; font-weight: 600; margin-bottom: 8px; color: #1d1d1f;
+  display: flex; align-items: center; gap: 6px;
+}
+.dp-day-label .badge {
+  font-size: 12px; background: #0071e3; color: #fff;
+  padding: 1px 8px; border-radius: 20px; font-weight: 500;
+}
+.dp-card {
+  background: #fff; border: 1px solid #e5e5ea; border-radius: 14px;
+  padding: 14px 16px; margin-bottom: 8px;
+}
+.dp-card-header {
+  display: flex; justify-content: space-between; align-items: flex-start;
+  margin-bottom: 10px; padding-bottom: 10px; border-bottom: 1px solid #f0f0f5;
+}
+.dp-time { font-size: 14px; font-weight: 600; color: #0071e3; }
+.dp-name { font-size: 16px; font-weight: 600; }
+.dp-contact { font-size: 12px; color: #86868b; margin-top: 2px; }
+.dp-cancel-btn {
+  font-size: 12px; padding: 5px 12px; border-radius: 8px; cursor: pointer;
+  border: none; background: #fff0f0; color: #ff3b30;
+  -webkit-tap-highlight-color: transparent; white-space: nowrap;
+}
+.dp-cancel-btn:active { background: #ffd6d6; }
+.dp-field { margin-bottom: 6px; font-size: 13px; display: flex; gap: 6px; }
+.dp-field .key { color: #86868b; flex-shrink: 0; min-width: 56px; }
+.dp-field .val { color: #1d1d1f; }
+.dp-first-badge {
+  display: inline-block; font-size: 11px; padding: 2px 8px;
+  border-radius: 20px; margin-bottom: 8px;
+}
+.dp-first-badge.first { background: #e8f4fd; color: #0071e3; }
+.dp-first-badge.revisit { background: #f0f0f5; color: #86868b; }
+.dp-q-undone {
+  background: #fff9ec; border: 1px solid #f0c040; border-radius: 8px;
+  padding: 8px 10px; margin-top: 8px; font-size: 12px; color: #8b6914;
+}
+
+.empty-state { text-align: center; padding: 40px 20px; color: #86868b; }
+.empty-state .ico { font-size: 40px; margin-bottom: 10px; }
+
+.toast {
+  position: fixed; top: 20px; left: 50%; transform: translateX(-50%);
+  background: #1d1d1f; color: #fff; padding: 10px 20px; border-radius: 10px;
+  font-size: 14px; z-index: 200; opacity: 0; transition: opacity .25s;
+  pointer-events: none; white-space: nowrap;
+}
+.toast.show { opacity: 1; }
+.toast.error { background: #ff3b30; }
+.toast.ok { background: #34c759; }
+
+.top-nav {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 14px;
+}
+.top-title { font-size: 15px; font-weight: 600; color: #1d1d1f; }
+.slot-cancel-btn {
+  font-size: 11px; padding: 4px 10px; border-radius: 8px; cursor: pointer;
+  border: 1px solid #ff3b30; background: #fff; color: #ff3b30;
+  -webkit-tap-highlight-color: transparent; white-space: nowrap;
+}
+.slot-cancel-btn:active { background: #fff0f0; }
+.slot-complete-btn {
+  font-size: 11px; padding: 4px 10px; border-radius: 8px; cursor: pointer;
+  border: 1px solid #0071e3; background: #fff; color: #0071e3;
+  -webkit-tap-highlight-color: transparent; white-space: nowrap;
+  margin-right: 6px;
+}
+.slot-complete-btn:active { background: #f0f5ff; }
+.doctor-entry-btn {
+  font-size: 13px; color: #86868b; background: #f5f5f7; border: none;
+  border-radius: 8px; padding: 6px 12px; cursor: pointer;
+}
+</style>
+</head>
+<body>
+<div class="container" id="app">
+
+  <div class="top-nav">
+    <span class="top-title" id="view-title">张医生义诊预约</span>
+    <button class="doctor-entry-btn" onclick="toggleDoctor()" id="doctor-toggle-btn">医生入口</button>
+  </div>
+
+  <div id="resident-view">
+    <div class="doctor-card">
+      <div class="doctor-header">
+        <div class="doctor-avatar">张</div>
+        <div>
+          <div class="doctor-name">张医生</div>
+          <span class="doctor-tag">中医 · 康复理疗</span>
+        </div>
+      </div>
+      <div class="doctor-skills">
+        <strong>擅长方向：</strong>颈肩腰腿疼痛、落枕、中风康复、产后康复、小儿肠胃调理、失眠、青少年脊柱侧弯等
+      </div>
+    </div>
+
+    <div class="notice-box">
+      <div class="notice-title">温馨提示</div>
+      张医生正在产假休息期间，因心系邻里健康，特开展公益义诊。每日义诊名额有限，<strong>优先接诊首诊邻居</strong>。若您需要复诊，请与医生直接私信另行安排复诊时间，感谢大家的理解与体贴，也请共同珍惜和守护医生的休息时间 🌸
+    </div>
+
+    <div class="date-bar" id="date-bar"></div>
+
+    <div class="cancel-notice" id="cancel-notice" style="display:none;">
+      ℹ️ 如需取消预约，请在<strong>预约当天上午10:00前</strong>操作，感谢配合！
+    </div>
+
+    <div class="section-label">
+      <span id="selected-date-label">--</span>
+      <div class="legend">
+        <span><span class="ld" style="background:#34c759;"></span>可预约</span>
+        <span><span class="ld" style="background:#ff3b30;"></span>已满</span>
+      </div>
+    </div>
+
+    <div class="slot-list" id="slot-list">
+      <div class="empty-state"><div class="ico">⏳</div><p>加载中...</p></div>
+    </div>
+  </div>
+
+  <div id="doctor-view" style="display:none;">
+    <div class="doctor-panel-wrap" id="doctor-content">
+      <div class="empty-state"><div class="ico">⏳</div><p>加载中...</p></div>
+    </div>
+  </div>
+
+</div>
+
+<!-- 弹窗 -->
+<div class="modal-overlay" id="modal" style="display:none;" onclick="handleOverlayClick(event)">
+  <div class="modal" id="modal-content"></div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const WEEKDAYS = ['周日','周一','周二','周三','周四','周五','周六'];
+let allSlots = {};
+let activeDay = null;
+let isDoctor = false;
+let pendingSlot = null;
+let selectedFirst = null;
+let lockName = '';
+let cancelSlot = null;
+let completeSlot = null;
+let lastLockTime = 0;  // 前端锁号冷却（毫秒时间戳）
+
+/* ========== Cookie 辅助 ========== */
+function setCookie(name, value, days) {
+  const d = new Date();
+  d.setTime(d.getTime() + days * 86400000);
+  document.cookie = `${name}=${value};expires=${d.toUTCString()};path=/`;
+}
+function getCookie(name) {
+  const match = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
+  return match ? match[2] : '';
+}
+
+/* ========== 数据拉取 ========== */
+async function fetchData() {
+  try {
+    const res = await fetch('/api/slots');
+    const json = await res.json();
+    allSlots = json.slots || {};
+    const days = Object.keys(allSlots).sort();
+    if (!activeDay) activeDay = days[0] || '';
+    renderDateBar();
+    renderSlots();
+  } catch(e) {
+    document.getElementById('slot-list').innerHTML = '<div class="empty-state"><div class="ico">😵</div><p>加载失败，请下拉刷新</p></div>';
+  }
+}
+
+/* ========== 日期栏 ========== */
+function renderDateBar() {
+  const days = Object.keys(allSlots).sort();
+  const bar = document.getElementById('date-bar');
+  bar.innerHTML = days.map(d => {
+    const dt = new Date(d + 'T00:00:00');
+    const active = d === activeDay ? ' active' : '';
+    return `<div class="date-chip${active}" onclick="selectDay('${d}')">
+      <div class="dow">${WEEKDAYS[dt.getDay()]}</div>
+      <div class="dd">${dt.getMonth()+1}/${dt.getDate()}</div>
+    </div>`;
+  }).join('');
+}
+
+function selectDay(day) {
+  activeDay = day;
+  renderDateBar();
+  renderSlots();
+}
+
+/* ========== 时间格渲染 ========== */
+function renderSlots() {
+  if (!activeDay || !allSlots[activeDay]) return;
+  const slots = allSlots[activeDay];
+  const dt = new Date(activeDay + 'T00:00:00');
+  document.getElementById('selected-date-label').textContent =
+    `${activeDay}（${WEEKDAYS[dt.getDay()]}）下午义诊`;
+
+  document.getElementById('cancel-notice').style.display = 'block';
+
+  const list = document.getElementById('slot-list');
+  list.innerHTML = slots.map(s => {
+    let ico, badge, sub, clickAttr, cls, extraBtn = '';
+    if (s.status === 'available') {
+      ico = '🟢'; badge = '立即预约'; sub = '可预约'; cls = 'available';
+      clickAttr = `onclick="openLock('${activeDay}','${s.time}')"`;
+    } else if (s.status === 'booked') {
+      ico = '🔴'; badge = '已约满'; sub = '该时段已预约'; cls = 'booked';
+      let buttons = '';
+      if (s.booking && s.booking.can_cancel) {
+        buttons += `<button class="slot-cancel-btn" onclick="openCancel('${activeDay}','${s.time}')">取消预约</button>`;
+      }
+      if (s.booking && !s.booking.questionnaire_done) {
+        buttons = `<button class="slot-complete-btn" onclick="openCompleteVerify('${activeDay}','${s.time}')">补填问卷</button>` + buttons;
+      }
+      extraBtn = `<div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;">${buttons}</div>`;
+    } else {
+      ico = '⚫'; badge = '已过期'; sub = '时段已过'; cls = 'expired';
+    }
+    return `<div class="slot-card ${cls}" ${clickAttr}>
+      <div class="slot-left">
+        <div class="slot-icon">${ico}</div>
+        <div>
+          <div class="slot-time">${s.time}</div>
+          <div class="slot-sub">${sub}</div>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;">
+        <div class="slot-badge">${badge}</div>
+        ${extraBtn}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+/* ========== 第一步：锁号（仅姓名） ========== */
+function openLock(day, timeSlot) {
+  // 前端冷却检查
+  const now = Date.now();
+  if (now - lastLockTime < 5000) {
+    showToast('操作太快，请稍后再试', true);
+    return;
+  }
+
+  pendingSlot = { day, timeSlot };
+  const dt = new Date(day + 'T00:00:00');
+  const dayLabel = `${day} ${WEEKDAYS[dt.getDay()]} ${timeSlot}`;
+  document.getElementById('modal').style.display = 'flex';
+  document.getElementById('modal-content').innerHTML = `
+    <div class="modal-handle"></div>
+    <h3>确认预约时段</h3>
+    <div class="modal-sub">${dayLabel}</div>
+    <p style="font-size:13px;color:#86868b;margin-bottom:16px;line-height:1.6;">
+      填写姓名即可立即锁号，锁号成功后再填写诊前问卷。<br>
+      <strong style="color:#34c759;">⚡ 先到先得，手快有手慢无！</strong>
+    </p>
+    <div class="form-section">
+      <div class="input-group">
+        <label>姓名<span class="required">*</span></label>
+        <input id="f-name" type="text" placeholder="请输入您的姓名" autocomplete="name">
+      </div>
+    </div>
+    <button class="btn btn-primary" id="lock-btn" onclick="submitLock()">立即锁号</button>
+    <button class="btn btn-secondary" onclick="closeModal()">取消</button>
+  `;
+  setTimeout(() => { const el = document.getElementById('f-name'); if(el) el.focus(); }, 300);
+}
+
+async function submitLock() {
+  const name = document.getElementById('f-name').value.trim();
+  if (!name) { showToast('请填写姓名', true); return; }
+
+  const btn = document.getElementById('lock-btn');
+  btn.disabled = true;
+  btn.textContent = '锁号中...';
+  lastLockTime = Date.now();
+
+  const { day, timeSlot } = pendingSlot;
+  try {
+    const res = await fetch('/api/book/lock', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ day, time_slot: timeSlot, name })
+    });
+    const data = await res.json();
+    if (data.ok) {
+      lockName = name;
+      showQuestionnaire(day, timeSlot, name);
+    } else {
+      showToast(data.error || '锁号失败', true);
+      btn.disabled = false;
+      btn.textContent = '立即锁号';
+    }
+  } catch(e) {
+    showToast('网络错误，请重试', true);
+    btn.disabled = false;
+    btn.textContent = '立即锁号';
+  }
+}
+
+/* ========== 第二步：诊前问卷 ========== */
+function showQuestionnaire(day, timeSlot, name, existing) {
+  const dt = new Date(day + 'T00:00:00');
+  const isComplete = !!existing;
+  document.getElementById('modal-content').innerHTML = `
+    <div class="modal-handle"></div>
+    <h3>${isComplete ? '补填诊前问卷' : '锁号成功！'}</h3>
+    <div class="modal-sub">${day} ${WEEKDAYS[dt.getDay()]} ${timeSlot}${isComplete ? ' · 补填问卷' : ''}</div>
+    ${!isComplete ? `<p style="font-size:13px;color:#86868b;margin-bottom:16px;line-height:1.6;">
+      时段已为您保留<br>请填写诊前问卷，方便医生提前了解病情
+    </p>` : ''}
+    <div class="form-section">
+      <div class="form-section-title">诊前问卷${isComplete ? '（补填）' : '（选填）'}</div>
+      <div class="input-group">
+        <label>联系方式<span class="optional">（可选，方便医生回访）</span></label>
+        <input id="f-contact" type="text" placeholder="手机号或微信号" value="${existing ? (existing.contact || '') : ''}">
+      </div>
+      <div class="input-group">
+        <label>是否首次就诊<span class="required">*</span></label>
+        <div class="radio-group">
+          <div class="radio-btn" id="rb-first" onclick="selectFirst('首诊')">首诊</div>
+          <div class="radio-btn" id="rb-revisit" onclick="selectFirst('复诊')">复诊</div>
+        </div>
+      </div>
+      <div class="input-group">
+        <label>主要不适<span class="required">*</span></label>
+        <textarea id="f-complaint" placeholder="请描述主要症状，如：颈部疼痛伴手麻、腰痛等">${existing ? (existing.complaint || '') : ''}</textarea>
+      </div>
+      <div class="input-group">
+        <label>症状持续时长<span class="optional">（可选）</span></label>
+        <select id="f-duration">
+          <option value="">请选择</option>
+          <option ${existing && existing.duration === '1周以内' ? 'selected' : ''}>1周以内</option>
+          <option ${existing && existing.duration === '1个月以内' ? 'selected' : ''}>1个月以内</option>
+          <option ${existing && existing.duration === '3个月以内' ? 'selected' : ''}>3个月以内</option>
+          <option ${existing && existing.duration === '半年以内' ? 'selected' : ''}>半年以内</option>
+          <option ${existing && existing.duration === '超过半年' ? 'selected' : ''}>超过半年</option>
+        </select>
+      </div>
+      <div class="input-group">
+        <label>既往病史或用药<span class="optional">（可选）</span></label>
+        <input id="f-history" type="text" placeholder="如：高血压、糖尿病、无" value="${existing ? (existing.history || '') : ''}">
+      </div>
+    </div>
+    <div id="revisit-notice" style="display:none; background:#fff9ec; border-left:3px solid #f0a500; border-radius:0 8px 8px 0; padding:10px 12px; margin-bottom:14px; font-size:13px; color:#5a4000; line-height:1.6;">
+      复诊邻居麻烦直接私信张医生预约时间哦，义诊名额优先留给首诊的邻居，感谢理解 🌸
+    </div>
+    <button class="btn btn-primary" id="submit-q-btn" onclick="submitQuestionnaire('${day}','${timeSlot}','${name}',${isComplete})">${isComplete ? '提交补填' : '提交问卷'}</button>
+    ${!isComplete ? `<button class="btn btn-secondary" onclick="skipQuestionnaire()">暂不填写，稍后补填</button>` : ''}
+  `;
+  if (existing && existing.is_first) {
+    selectFirst(existing.is_first);
+  }
+  pendingSlot = { day, timeSlot };
+  lockName = name;
+}
+
+async function submitQuestionnaire(day, timeSlot, name, isComplete) {
+  const complaint = document.getElementById('f-complaint').value.trim();
+  if (!selectedFirst) { showToast('请选择是否首诊', true); return; }
+  if (!complaint) { showToast('请填写主要不适', true); return; }
+
+  const btn = document.getElementById('submit-q-btn');
+  btn.disabled = true;
+  btn.textContent = '提交中...';
+
+  const body = {
+    day,
+    time_slot: timeSlot,
+    name,
+    complaint,
+    duration: document.getElementById('f-duration').value,
+    history: document.getElementById('f-history').value.trim(),
+    is_first: selectedFirst,
+    contact: document.getElementById('f-contact').value.trim(),
+  };
+
+  try {
+    const res = await fetch('/api/book/questionnaire', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+    const data = await res.json();
+    if (data.ok) {
+      showFinalSuccess(day, timeSlot, name, complaint, isComplete);
+    } else {
+      showToast(data.error || '提交失败', true);
+      btn.disabled = false;
+      btn.textContent = isComplete ? '提交补填' : '提交问卷';
+    }
+  } catch(e) {
+    showToast('网络错误，请重试', true);
+    btn.disabled = false;
+    btn.textContent = isComplete ? '提交补填' : '提交问卷';
+  }
+}
+
+function skipQuestionnaire() {
+  showFinalSuccess(pendingSlot.day, pendingSlot.timeSlot, lockName, '（待补充）', false);
+}
+
+/* ========== 补填问卷：先验证身份（仅姓名） ========== */
+function openCompleteVerify(day, timeSlot) {
+  completeSlot = { day, timeSlot };
+  const dt = new Date(day + 'T00:00:00');
+  document.getElementById('modal').style.display = 'flex';
+  document.getElementById('modal-content').innerHTML = `
+    <div class="modal-handle"></div>
+    <h3>补填诊前问卷</h3>
+    <div class="modal-sub">${day} ${WEEKDAYS[dt.getDay()]} ${timeSlot}</div>
+    <p style="font-size:13px;color:#86868b;margin-bottom:16px;line-height:1.6;">
+      请填写预约时使用的姓名，验证通过后即可补填问卷。
+    </p>
+    <div class="input-group">
+      <label>姓名<span class="required">*</span></label>
+      <input id="verify-name" type="text" placeholder="请输入预约姓名">
+    </div>
+    <button class="btn btn-primary" id="verify-btn" onclick="submitCompleteVerify()">验证并补填</button>
+    <button class="btn btn-secondary" onclick="closeModal()">取消</button>
+  `;
+  setTimeout(() => { const el = document.getElementById('verify-name'); if(el) el.focus(); }, 300);
+}
+
+async function submitCompleteVerify() {
+  const name = document.getElementById('verify-name').value.trim();
+  if (!name) { showToast('请填写姓名', true); return; }
+
+  const btn = document.getElementById('verify-btn');
+  btn.disabled = true;
+  btn.textContent = '验证中...';
+
+  const { day, timeSlot } = completeSlot;
+  try {
+    const res = await fetch('/api/book/verify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ day, time_slot: timeSlot, name })
+    });
+    const data = await res.json();
+    if (data.ok) {
+      closeModal();
+      showQuestionnaire(day, timeSlot, name, data.booking);
+    } else {
+      showToast(data.error || '验证失败', true);
+      btn.disabled = false;
+      btn.textContent = '验证并补填';
+    }
+  } catch(e) {
+    showToast('网络错误，请重试', true);
+    btn.disabled = false;
+    btn.textContent = '验证并补填';
+  }
+}
+
+/* ========== 居民取消预约（仅姓名） ========== */
+function openCancel(day, timeSlot) {
+  cancelSlot = { day, timeSlot };
+  const dt = new Date(day + 'T00:00:00');
+  document.getElementById('modal').style.display = 'flex';
+  document.getElementById('modal-content').innerHTML = `
+    <div class="modal-handle"></div>
+    <h3>取消预约</h3>
+    <div class="modal-sub">${day} ${WEEKDAYS[dt.getDay()]} ${timeSlot}</div>
+    <p style="font-size:13px;color:#86868b;margin-bottom:16px;line-height:1.6;">
+      请填写预约时使用的姓名，验证通过即可取消。<br>
+      <span style="color:#ff9800;">⚠️ 预约当天上午10:00后不可取消，如需调整请联系医生。</span>
+    </p>
+    <div class="input-group">
+      <label>姓名<span class="required">*</span></label>
+      <input id="cancel-name" type="text" placeholder="请输入预约姓名">
+    </div>
+    <button class="btn btn-primary" id="cancel-btn" onclick="submitCancel()">确认取消</button>
+    <button class="btn btn-secondary" onclick="closeModal()">返回</button>
+  `;
+  setTimeout(() => { const el = document.getElementById('cancel-name'); if(el) el.focus(); }, 300);
+}
+
+async function submitCancel() {
+  const name = document.getElementById('cancel-name').value.trim();
+  if (!name) { showToast('请填写姓名', true); return; }
+
+  const btn = document.getElementById('cancel-btn');
+  btn.disabled = true;
+  btn.textContent = '取消中...';
+
+  try {
+    const res = await fetch('/api/cancel/resident', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ day: cancelSlot.day, time_slot: cancelSlot.timeSlot, name })
+    });
+    const data = await res.json();
+    if (data.ok) {
+      closeModal();
+      showToast('预约已取消，号源已释放 🎉', false, true);
+      fetchData();
+    } else {
+      showToast(data.error || '取消失败', true);
+      btn.disabled = false;
+      btn.textContent = '确认取消';
+    }
+  } catch(e) {
+    showToast('网络错误，请重试', true);
+    btn.disabled = false;
+    btn.textContent = '确认取消';
+  }
+}
+
+/* ========== 预约成功页面 ========== */
+function showFinalSuccess(day, timeSlot, name, complaint, isComplete) {
+  const dt = new Date(day + 'T00:00:00');
+  document.getElementById('modal-content').innerHTML = `
+    <div class="success-screen">
+      <div class="success-icon">✅</div>
+      <h3>${isComplete ? '补填成功！' : '预约成功！'}</h3>
+      <p class="success-sub">${isComplete ? '诊前问卷已提交，医生可提前了解病情<br>' : '请准时到达，如有变化请提前告知<br>义诊地点以群内通知为准'}</p>
+      <div class="booking-confirm-card">
+        <div class="row"><span class="label">就诊时段</span><span class="val">${day} ${WEEKDAYS[dt.getDay()]} ${timeSlot}</span></div>
+        <div class="row"><span class="label">姓名</span><span class="val">${name}</span></div>
+      </div>
+      ${!isComplete ? `<div style="background:#f0f5ff;border-radius:10px;padding:10px 12px;margin-bottom:16px;font-size:12px;color:#0071e3;line-height:1.6;">
+        ℹ️ 如需取消，请在<strong>预约当天上午10:00前</strong>操作，逾时请联系医生调整
+      </div>` : ''}
+      <button class="btn btn-primary" onclick="closeModalAndRefresh()">完成</button>
+    </div>
+  `;
+}
+
+function closeModalAndRefresh() {
+  closeModal();
+  fetchData();
+}
+
+function selectFirst(val) {
+  selectedFirst = val;
+  document.getElementById('rb-first').className = 'radio-btn' + (val === '首诊' ? ' selected' : '');
+  document.getElementById('rb-revisit').className = 'radio-btn' + (val === '复诊' ? ' selected' : '');
+  const notice = document.getElementById('revisit-notice');
+  if (notice) notice.style.display = val === '复诊' ? 'block' : 'none';
+}
+
+/* ========== 弹窗通用 ========== */
+function closeModal() {
+  document.getElementById('modal').style.display = 'none';
+  pendingSlot = null;
+  selectedFirst = null;
+  lockName = '';
+  completeSlot = null;
+}
+function handleOverlayClick(e) {
+  if (e.target === document.getElementById('modal')) closeModal();
+}
+
+/* ========== 医生管理 ========== */
+async function toggleDoctor() {
+  if (isDoctor) {
+    isDoctor = false;
+    document.getElementById('resident-view').style.display = 'block';
+    document.getElementById('doctor-view').style.display = 'none';
+    document.getElementById('doctor-toggle-btn').textContent = '医生入口';
+    document.getElementById('view-title').textContent = '张医生义诊预约';
+    fetchData();
+    return;
+  }
+  document.getElementById('modal').style.display = 'flex';
+  document.getElementById('modal-content').innerHTML = `
+    <div class="modal-handle"></div>
+    <h3>医生管理入口</h3>
+    <div class="modal-sub">请输入管理密码</div>
+    <div class="input-group">
+      <input id="doc-pwd" type="password" placeholder="管理密码" autocomplete="off">
+    </div>
+    <button class="btn btn-primary" onclick="doctorLogin()">进入</button>
+    <button class="btn btn-secondary" onclick="closeModal()">取消</button>
+  `;
+  setTimeout(() => { const el = document.getElementById('doc-pwd'); if(el) el.focus(); }, 300);
+}
+
+async function doctorLogin() {
+  const pwd = document.getElementById('doc-pwd').value.trim();
+  if (!pwd) { showToast('请输入密码', true); return; }
+  try {
+    const res = await fetch(`/api/doctor?t=${encodeURIComponent(pwd)}`);
+    const data = await res.json();
+    if (data.ok) {
+      closeModal();
+      isDoctor = true;
+      document.getElementById('resident-view').style.display = 'none';
+      document.getElementById('doctor-view').style.display = 'block';
+      document.getElementById('doctor-toggle-btn').textContent = '退出管理';
+      document.getElementById('view-title').textContent = '预约管理';
+      renderDoctorView(data.data);
+      doctorPwd = pwd;
+    } else {
+      showToast('密码错误', true);
+    }
+  } catch(e) {
+    showToast('网络错误', true);
+  }
+}
+
+let doctorPwd = '';
+
+function renderDoctorView(bookingData) {
+  const container = document.getElementById('doctor-content');
+  if (!bookingData || bookingData.length === 0) {
+    container.innerHTML = '<div class="empty-state"><div class="ico">📭</div><p>暂无预约记录</p></div>';
+    return;
+  }
+
+  container.innerHTML = bookingData.map(day => {
+    const dt = new Date(day.date + 'T00:00:00');
+    const cards = day.bookings.map(b => {
+      const firstCls = b.is_first === '首诊' ? 'first' : 'revisit';
+      const firstLabel = b.is_first || '';
+      const qDone = b.questionnaire_done;
+      return `<div class="dp-card">
+        <div class="dp-card-header">
+          <div>
+            <div class="dp-time">${b.time}</div>
+            <div class="dp-name">${b.name}</div>
+            ${b.contact ? `<div class="dp-contact">📞 ${b.contact}</div>` : ''}
+          </div>
+          <button class="dp-cancel-btn" onclick="doctorCancel('${day.date}','${b.time}')">取消预约</button>
+        </div>
+        ${firstLabel ? `<span class="dp-first-badge ${firstCls}">${firstLabel}</span>` : ''}
+        ${!qDone ? `<div class="dp-q-undone">⚠️ 诊前问卷待补充</div>` : ''}
+        <div class="dp-field"><span class="key">主诉</span><span class="val">${b.complaint || '—'}</span></div>
+        ${b.duration ? `<div class="dp-field"><span class="key">持续时长</span><span class="val">${b.duration}</span></div>` : ''}
+        ${b.history ? `<div class="dp-field"><span class="key">既往病史</span><span class="val">${b.history}</span></div>` : ''}
+        <div class="dp-field" style="color:#86868b;font-size:11px;margin-top:6px;">预约于 ${b.booked_at}</div>
+      </div>`;
+    }).join('');
+
+    return `<div class="dp-day-group">
+      <div class="dp-day-label">
+        ${day.date}（${WEEKDAYS[dt.getDay()]}）
+        <span class="badge">${day.bookings.length} 人</span>
+      </div>
+      ${cards}
+    </div>`;
+  }).join('');
+}
+
+async function doctorCancel(day, timeSlot) {
+  if (!confirm('确认取消此预约？号源将立即释放。')) return;
+
+  try {
+    const res = await fetch('/api/cancel', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        day, time_slot: timeSlot,
+        t: doctorPwd,
+      })
+    });
+    const data = await res.json();
+    if (data.ok) {
+      showToast(data.message || '已取消，号源已释放', false, true);
+      const r2 = await fetch(`/api/doctor?t=${encodeURIComponent(doctorPwd)}`);
+      const d2 = await r2.json();
+      if (d2.ok) renderDoctorView(d2.data);
+      fetchData();
+    } else {
+      showToast(data.error || '操作失败', true);
+    }
+  } catch(e) {
+    showToast('网络错误', true);
+  }
+}
+
+/* ========== Toast ========== */
+function showToast(msg, isError, isOk) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast show' + (isError ? ' error' : isOk ? ' ok' : '');
+  clearTimeout(t._t);
+  t._t = setTimeout(() => { t.className = 'toast'; }, 2200);
+}
+
+/* ========== 启动 ========== */
+fetchData();
+setInterval(fetchData, 60000);
+</script>
+</body>
+</html>

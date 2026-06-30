@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>张医生 · 预约管理</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin:0; padding:0; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', sans-serif;
+  background: #f5f5f7; color: #1d1d1f;
+  line-height: 1.5; -webkit-font-smoothing: antialiased;
+  min-height: 100vh;
+}
+.container { max-width: 480px; margin:0 auto; padding:16px; }
+
+/* ===== 管理页 ===== */
+.top-bar {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 14px;
+}
+.top-bar h2 { font-size: 18px; font-weight: 700; }
+
+/* 统计卡片 */
+.stats-row { display: flex; gap: 8px; margin-bottom: 16px; }
+.stat-card {
+  flex:1; background: #fff; border-radius: 14px; padding: 12px 8px;
+  text-align: center; border:1px solid #e5e5ea;
+}
+.stat-card .num { font-size: 22px; font-weight: 700; color: #0071e3; }
+.stat-card .lbl { font-size: 11px; color: #86868b; margin-top: 2px; }
+
+/* 日期筛选栏 */
+.date-bar {
+  display: flex; gap: 8px; overflow-x: auto; padding: 4px 0 16px;
+  -webkit-overflow-scrolling: touch; scrollbar-width: none;
+}
+.date-bar::-webkit-scrollbar { display: none; }
+.date-chip {
+  flex-shrink: 0; min-width: 56px; padding: 8px 10px;
+  border-radius: 12px; text-align: center; cursor: pointer;
+  background: #fff; border: 1px solid #e5e5ea; font-size: 13px;
+  -webkit-tap-highlight-color: transparent; user-select: none;
+}
+.date-chip:active { transform: scale(0.95); }
+.date-chip .dow { font-size: 11px; color: #86868b; margin-bottom: 2px; }
+.date-chip .dd { font-size: 14px; font-weight: 600; }
+.date-chip.active { background: #0071e3; border-color: #0071e3; color: #fff; }
+.date-chip.active .dow { color: rgba(255,255,255,0.7); }
+.date-chip .today-dot {
+  width: 5px; height: 5px; background: #34c759; border-radius: 50%;
+  display: inline-block; margin-left: 3px; vertical-align: middle;
+}
+
+/* 预约卡片 */
+.day-group { margin-bottom: 24px; }
+.day-group-header {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 12px; padding-bottom: 8px; border-bottom: 2px solid #e5e5ea;
+}
+.day-group-label { font-size: 16px; font-weight: 700; }
+.day-group-count {
+  font-size: 12px; background: #0071e3; color: #fff;
+  padding: 2px 10px; border-radius: 20px;
+}
+
+.bk-card {
+  background: #fff; border:1px solid #e5e5ea; border-radius: 16px;
+  padding: 16px; margin-bottom: 10px; position: relative;
+  overflow: hidden;
+}
+/* 左侧蓝色色条 */
+.bk-card::before {
+  content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 4px;
+  border-radius: 4px 0 0 4px; background: #0071e3;
+}
+.bk-time-block {
+  display: flex; align-items: baseline; gap: 8px;
+  margin-bottom: 10px; padding-left: 8px;
+}
+.bk-date { font-size: 15px; font-weight: 700; color: #0071e3; }
+.bk-slot { font-size: 13px; color: #0071e3; font-weight: 600; }
+
+.bk-name { font-size: 17px; font-weight: 700; margin-bottom: 2px; padding-left: 8px; }
+.bk-contact { font-size: 13px; color: #86868b; margin-bottom: 10px; padding-left: 8px; }
+
+.bk-tags { display: flex; gap: 6px; margin-bottom: 10px; padding-left: 8px; }
+.bk-tag { font-size: 11px; padding: 3px 8px; border-radius: 6px; font-weight: 500; }
+.tag-first { background: #e8f4fd; color: #0071e3; }
+.tag-revisit { background: #f0f0f5; color: #86868b; }
+.tag-q-undone { background: #fff9ec; color: #b8860b; }
+
+.bk-field { font-size: 13px; margin-bottom: 5px; display: flex; gap: 6px; padding-left: 8px; }
+.bk-field .fk { color: #86868b; flex-shrink: 0; min-width: 52px; }
+.bk-field .fv { color: #1d1d1f; }
+
+.bk-actions {
+  margin-top: 14px; padding-top: 12px;
+  padding-left: 8px; border-top: 1px solid #f0f0f5;
+}
+.bk-action-btn {
+  width: 100%; padding: 10px 0; border-radius: 10px; border: none;
+  font-size: 14px; font-weight: 500; cursor: pointer;
+  background: #fff0f0; color: #ff3b30;
+  -webkit-tap-highlight-color: transparent;
+}
+.bk-action-btn:active { background: #ffd6d6; }
+
+.empty-state { text-align: center; padding: 40px 20px; color: #86868b; }
+.empty-state .ico { font-size: 40px; margin-bottom: 10px; }
+
+/* 未授权提示 */
+.unauth-wrap {
+  min-height: 100vh; display: flex; align-items: center; justify-content: center;
+  padding: 24px;
+}
+.unauth-card {
+  background: #fff; border-radius: 22px; padding: 36px 28px; width:100%; max-width:360px;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.08); text-align: center;
+}
+.unauth-card .sub { font-size: 13px; color: #86868b; margin-bottom: 24px; }
+
+.toast {
+  position: fixed; top: 20px; left: 50%; transform: translateX(-50%);
+  background: #1d1d1f; color: #fff; padding: 10px 20px; border-radius: 10px;
+  font-size: 14px; z-index: 200; opacity: 0; transition: opacity .25s;
+  pointer-events: none; white-space: nowrap;
+}
+.toast.show { opacity: 1; }
+.toast.ok { background: #34c759; }
+.toast.error { background: #ff3b30; }
+</style>
+</head>
+<body>
+
+<!-- 未授权提示 -->
+<div class="unauth-wrap" id="unauth-page">
+  <div class="unauth-card">
+    <h2>张医生管理后台</h2>
+    <div class="sub">链接无效或已过期，请使用医生提供的正确链接访问</div>
+    <div style="font-size:12px;color:#c7c7cc;line-height:1.6;">
+      正确链接格式：<br>
+      <code style="background:#f5f5f7;padding:2px 6px;border-radius:4px;">/doctor?t=密码</code>
+    </div>
+  </div>
+</div>
+
+<!-- 管理页 -->
+<div class="container" id="manage-page" style="display:none;">
+  <div class="top-bar">
+    <h2>📋 预约管理</h2>
+    <span style="font-size:13px;color:#86868b;" id="last-update"></span>
+  </div>
+
+  <div class="stats-row" id="stats-row"></div>
+
+  <!-- 日期筛选栏 -->
+  <div class="date-bar" id="date-bar"></div>
+
+  <!-- 预约列表 -->
+  <div id="bk-list">
+    <div class="empty-state"><div class="ico">⏳</div><p>加载中...</p></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const WEEKDAYS = ['周日','周一','周二','周三','周四','周五','周六'];
+let doctorPwd = '';
+let allData = { bookings: [] };
+let activeFilter = 'all'; // 'all' | 'YYYY-MM-DD'
+
+/* ===== 初始化：从 URL 参数获取 token 并自动登录 ===== */
+async function init() {
+  const params = new URLSearchParams(window.location.search);
+  const t = params.get('t');
+  if (!t) {
+    // 没有 token，显示未授权页面
+    document.getElementById('unauth-page').style.display = 'flex';
+    document.getElementById('manage-page').style.display = 'none';
+    return;
+  }
+
+  try {
+    const res = await fetch(`/api/doctor?t=${encodeURIComponent(t)}`);
+    const d = await res.json();
+    if (d.ok) {
+      doctorPwd = t;
+      allData = { bookings: d.data || [] };
+      showManagePage();
+      // 每30秒自动刷新
+      setInterval(refreshData, 30000);
+    } else {
+      document.getElementById('unauth-page').style.display = 'flex';
+      document.getElementById('manage-page').style.display = 'none';
+    }
+  } catch(e) {
+    showToast('网络错误，请刷新页面重试', true);
+  }
+}
+
+function showManagePage() {
+  document.getElementById('unauth-page').style.display = 'none';
+  document.getElementById('manage-page').style.display = 'block';
+  updateLastUpdate();
+  renderStats();
+  renderDateBar();
+  renderList();
+}
+
+async function refreshData() {
+  if (!doctorPwd) return;
+  try {
+    const res = await fetch(`/api/doctor?t=${encodeURIComponent(doctorPwd)}`);
+    const d = await res.json();
+    if (d.ok) {
+      allData = { bookings: d.data || [] };
+      renderStats();
+      renderDateBar();
+      renderList();
+      updateLastUpdate();
+    }
+  } catch(e) {
+    // 静默失败，不提示用户
+  }
+}
+
+function updateLastUpdate() {
+  const now = new Date();
+  const timeStr = `${now.getHours().toString().padStart(2,'0')}:${now.getMinutes().toString().padStart(2,'0')}`;
+  document.getElementById('last-update').textContent = `最近更新：${timeStr}`;
+}
+
+/* ===== 统计 ===== */
+function renderStats() {
+  const total = allData.bookings.reduce((s, d) => s + d.bookings.length, 0);
+  const today = new Date().toISOString().slice(0,10);
+  const todayCount = (allData.bookings.find(d => d.date === today) || { bookings: [] }).bookings.length;
+  document.getElementById('stats-row').innerHTML = `
+    <div class="stat-card"><div class="num">${total}</div><div class="lbl">总预约</div></div>
+    <div class="stat-card"><div class="num">${todayCount}</div><div class="lbl">今日预约</div></div>
+  `;
+}
+
+/* ===== 日期筛选栏 ===== */
+function renderDateBar() {
+  const days = allData.bookings
+    .map(d => d.date)
+    .filter((v, i, a) => a.indexOf(v) === i)
+    .sort();
+  const today = new Date().toISOString().slice(0,10);
+
+  let chips = `<div class="date-chip${activeFilter==='all'?' active':''}" onclick="filterDay('all')">
+      <div class="dow">全部</div>
+      <div class="dd">所有</div>
+    </div>`;
+
+  days.forEach(d => {
+    const dt = new Date(d + 'T00:00:00');
+    const isToday = d === today;
+    chips += `<div class="date-chip${activeFilter===d?' active':''}" onclick="filterDay('${d}')">
+      <div class="dow">${WEEKDAYS[dt.getDay()]}${isToday?'<span class="today-dot"></span>':''}</div>
+      <div class="dd">${dt.getMonth()+1}/${dt.getDate()}</div>
+    </div>`;
+  });
+
+  document.getElementById('date-bar').innerHTML = chips;
+}
+
+function filterDay(day) {
+  activeFilter = day;
+  renderDateBar();
+  renderList();
+}
+
+/* ===== 预约列表 ===== */
+function renderList() {
+  let days = allData.bookings.filter(d => {
+    if (activeFilter === 'all') return true;
+    return d.date === activeFilter;
+  });
+
+  if (days.length === 0) {
+    document.getElementById('bk-list').innerHTML =
+      '<div class="empty-state"><div class="ico">📭</div><p>暂无预约记录</p></div>';
+    return;
+  }
+
+  document.getElementById('bk-list').innerHTML = days.map(day => {
+    const dt = new Date(day.date + 'T00:00:00');
+    const cards = day.bookings.map(b => {
+      const firstCls = b.is_first === '首诊' ? 'tag-first' : 'tag-revisit';
+      const firstLabel = b.is_first || '';
+      const qDone = b.questionnaire_done;
+      return `<div class="bk-card">
+        <div class="bk-time-block">
+          <span class="bk-date">${day.date}（${WEEKDAYS[dt.getDay()]}）</span>
+          <span class="bk-slot">${b.time}</span>
+        </div>
+        <div class="bk-name">${b.name}</div>
+        ${b.contact ? `<div class="bk-contact">📞 ${b.contact}</div>` : ''}
+        <div class="bk-tags">
+          ${firstLabel ? `<span class="bk-tag ${firstCls}">${firstLabel}</span>` : ''}
+          ${!qDone ? '<span class="bk-tag tag-q-undone">⚠️ 问卷待补充</span>' : ''}
+        </div>
+        ${b.complaint ? `<div class="bk-field"><span class="fk">主诉</span><span class="fv">${b.complaint}</span></div>` : ''}
+        ${b.duration ? `<div class="bk-field"><span class="fk">持续</span><span class="fv">${b.duration}</span></div>` : ''}
+        ${b.history ? `<div class="bk-field"><span class="fk">病史</span><span class="fv">${b.history}</span></div>` : ''}
+        <div class="bk-field" style="color:#86868b;font-size:11px;"><span class="fk">预约于</span><span class="fv">${b.booked_at}</span></div>
+        <div class="bk-actions">
+          <button class="bk-action-btn" onclick="doctorCancel('${day.date}','${b.time}')">取消预约 · 释放号源</button>
+        </div>
+      </div>`;
+    }).join('');
+
+    return `<div class="day-group">
+      <div class="day-group-header">
+        <span class="day-group-label">${day.date}（${WEEKDAYS[dt.getDay()]}）</span>
+        <span class="day-group-count">${day.bookings.length} 人</span>
+      </div>
+      ${cards}
+    </div>`;
+  }).join('');
+}
+
+/* ===== 医生取消 ===== */
+async function doctorCancel(day, timeSlot) {
+  if (!confirm('确认取消此预约？\n号源将立即释放，居民可马上预约。')) return;
+  try {
+    const res = await fetch('/api/cancel', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ day, time_slot: timeSlot, t: doctorPwd })
+    });
+    const d = await res.json();
+    if (d.ok) {
+      showToast(d.message || '已取消，号源已释放', false, true);
+      refreshData();
+      // 同时刷新居民端数据（如果有人在看）
+      fetch('/api/slots').catch(()=>{});
+    } else {
+      showToast(d.error || '操作失败', true);
+    }
+  } catch(e) {
+    showToast('网络错误', true);
+  }
+}
+
+/* ===== Toast ===== */
+function showToast(msg, isErr, isOk) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast show' + (isErr ? ' error' : isOk ? ' ok' : '');
+  clearTimeout(t._t);
+  t._t = setTimeout(() => { t.className = 'toast'; }, 2200);
+}
+
+/* ===== 启动 ===== */
+init();
+</script>
+</body>
+</html>
