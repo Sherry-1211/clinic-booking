@@ -11,6 +11,7 @@ app = Flask(__name__)
 DATA_DIR = os.environ.get('DATA_DIR', os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data'))
 BOOKINGS_FILE = os.path.join(DATA_DIR, 'bookings.json')
 DOCTOR_TOKEN = os.environ.get('DOCTOR_TOKEN', 'yizhen2026')
+TEST_MODE = os.environ.get('TEST_MODE', '').lower() in ('1', 'true', 'yes')
 # 居民取消截止时间（预约当天几点后不可取消）
 CANCEL_DEADLINE_HOUR = 10
 # IP 防盗刷：两次锁号最小间隔（秒）
@@ -107,6 +108,8 @@ def get_next_week_range():
 
 def _check_booking_open():
     """检查当前是否在预约开放时段（周五及之后）。返回 (ok, err_msg)。"""
+    if TEST_MODE:
+        return True, ''
     today = date.today()
     if today.weekday() < 4:
         days_to_friday = 4 - today.weekday()
@@ -138,8 +141,8 @@ def get_slots():
 
     next_monday, next_sunday = get_next_week_range()
 
-    # 只在周五及之后放出号源（医生 token 可随时预览）
-    if today.weekday() < 4:
+    # 只在周五及之后放出号源（医生 token / 测试模式可随时预览）
+    if not TEST_MODE and today.weekday() < 4:
         t = request.args.get('t', '').strip()
         if t != DOCTOR_TOKEN:
             # 本周五是哪天
@@ -192,9 +195,9 @@ def lock_slot():
     time_slot = data.get('time_slot', '').strip()
     name = data.get('name', '').strip()
 
-    # 只在周五及之后接受预约
-    if date.today().weekday() < 4:
-        _, err = _check_booking_open()
+    # 只在周五及之后接受预约（测试模式跳过）
+    ok, err = _check_booking_open()
+    if not ok:
         return jsonify({'ok': False, 'error': err}), 403
 
     if not all([day, time_slot, name]):
