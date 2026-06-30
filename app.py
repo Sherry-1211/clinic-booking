@@ -125,7 +125,7 @@ def get_booking_window():
         cur += timedelta(days=7)
 
     if TEST_MODE:
-        num_released = max(num_released, 2)  # 测试模式至少显示 2 周
+        num_released = max(num_released, 1)  # 测试模式显示 1 周，与首次释放一致
 
     if num_released == 0:
         return None, None  # 尚未到任何释放日
