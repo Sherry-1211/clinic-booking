@@ -355,6 +355,21 @@ def doctor_view():
     return jsonify({'ok': True, 'data': result})
 
 
+@app.route('/api/doctor/clear-test-data', methods=['POST'])
+def clear_test_data():
+    """清空所有预约数据（需要 token 验证）。"""
+    t = (request.get_json(silent=True) or {}).get('t', '').strip()
+    if not t:
+        t = request.args.get('t', '').strip()
+    if t != DOCTOR_TOKEN:
+        return jsonify({'ok': False, 'error': '未授权'}), 403
+
+    bookings = load_bookings()
+    count = len(bookings)
+    save_bookings({})
+    return jsonify({'ok': True, 'message': f'已清空 {count} 条测试预约数据'})
+
+
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5099))
     app.run(host='0.0.0.0', port=port, debug=False)

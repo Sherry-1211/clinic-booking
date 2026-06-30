@@ -129,6 +129,21 @@ body {
 .toast.show { opacity: 1; }
 .toast.ok { background: #34c759; }
 .toast.error { background: #ff3b30; }
+
+/* 清空数据按钮 */
+.clear-section {
+  margin-top: 32px; padding: 20px 0; border-top: 2px dashed #e5e5ea;
+  text-align: center;
+}
+.clear-section .hint {
+  font-size: 12px; color: #86868b; margin-bottom: 12px;
+}
+.clear-btn {
+  padding: 12px 32px; border-radius: 12px; border: 2px solid #ff3b30;
+  background: #fff; color: #ff3b30; font-size: 14px; font-weight: 600;
+  cursor: pointer; -webkit-tap-highlight-color: transparent;
+}
+.clear-btn:active { background: #ff3b30; color: #fff; }
 </style>
 </head>
 <body>
@@ -160,6 +175,12 @@ body {
   <!-- 预约列表 -->
   <div id="bk-list">
     <div class="empty-state"><div class="ico">⏳</div><p>加载中...</p></div>
+  </div>
+
+  <!-- 清空测试数据 -->
+  <div class="clear-section">
+    <div class="hint">🧪 测试完成后清空所有预约数据</div>
+    <button class="clear-btn" onclick="clearTestData()">清空所有测试数据</button>
   </div>
 </div>
 
@@ -354,6 +375,29 @@ function showToast(msg, isErr, isOk) {
   t.className = 'toast show' + (isErr ? ' error' : isOk ? ' ok' : '');
   clearTimeout(t._t);
   t._t = setTimeout(() => { t.className = 'toast'; }, 2200);
+}
+
+/* ===== 清空测试数据 ===== */
+async function clearTestData() {
+  if (!confirm('⚠️ 确定要清空所有预约数据吗？\n\n此操作不可撤销！')) return;
+  if (!confirm('再次确认：真的要删除所有预约记录吗？')) return;
+
+  try {
+    const res = await fetch('/api/doctor/clear-test-data', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ t: doctorPwd })
+    });
+    const d = await res.json();
+    if (d.ok) {
+      showToast(d.message || '已清空', false, true);
+      refreshData();
+    } else {
+      showToast(d.error || '操作失败', true);
+    }
+  } catch(e) {
+    showToast('网络错误', true);
+  }
 }
 
 /* ===== 启动 ===== */
