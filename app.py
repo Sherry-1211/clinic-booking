@@ -103,8 +103,9 @@ def get_booking_window():
     """
     返回可预约的日期范围（含起止）。
     规则：每过一个周五自动释放 1 个新周，始终显示最近 2 个未过期周。
-    本周五 → 下周；下周五 → 下周+下下周；以此类推。
-    测试模式下始终返回 2 周（从最近一个周五后的周一开始）。
+    窗口锚定在首次释放周（FIRST_RELEASE 后的周一开始），逐周累加。
+    本周五 → 下周（1周）；下周五 → 下周+下下周（2周）；以此类推。
+    测试模式下始终返回 2 周。
     """
     today = date.today()
 
@@ -112,24 +113,27 @@ def get_booking_window():
     days_since_friday = (today.weekday() - 4) % 7
     most_recent_friday = today - timedelta(days=days_since_friday)
 
-    # 统计从首次释放日到现在过了几个周五
-    num_weeks = 0
+    # 第一个可预约周：FIRST_RELEASE 后的周一
+    days_to_monday = (7 - FIRST_RELEASE.weekday()) % 7
+    first_monday = FIRST_RELEASE + timedelta(days=days_to_monday)
+
+    # 统计从首次释放日到现在已释放了几周
+    num_released = 0
     cur = FIRST_RELEASE
     while cur <= most_recent_friday:
-        num_weeks += 1
+        num_released += 1
         cur += timedelta(days=7)
-    num_weeks = min(num_weeks, 2)  # 最多 2 周
 
     if TEST_MODE:
-        num_weeks = 2  # 测试模式始终显示 2 周
+        num_released = max(num_released, 2)  # 测试模式至少显示 2 周
 
-    if num_weeks == 0:
+    if num_released == 0:
         return None, None  # 尚未到任何释放日
 
-    # 窗口从下周一开始（永远不显示本周的号源）
-    this_week_monday = today - timedelta(days=today.weekday())
-    window_start = this_week_monday + timedelta(days=7)
-    window_end = window_start + timedelta(days=7 * num_weeks - 1)
+    # 始终显示最近 min(num_released, 2) 个已释放周
+    weeks_to_show = min(num_released, 2)
+    window_start = first_monday + timedelta(days=7 * (num_released - weeks_to_show))
+    window_end = first_monday + timedelta(days=7 * num_released - 1)
 
     return window_start, window_end
 
