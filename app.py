@@ -126,9 +126,9 @@ def get_booking_window():
     if num_weeks == 0:
         return None, None  # 尚未到任何释放日
 
-    # 窗口从最近一个周五所在周的下周一开始
-    friday_week_monday = most_recent_friday - timedelta(days=most_recent_friday.weekday())
-    window_start = friday_week_monday + timedelta(days=7)
+    # 窗口从下周一开始（永远不显示本周的号源）
+    this_week_monday = today - timedelta(days=today.weekday())
+    window_start = this_week_monday + timedelta(days=7)
     window_end = window_start + timedelta(days=7 * num_weeks - 1)
 
     return window_start, window_end
