@@ -106,6 +106,13 @@ def get_next_week_range():
     return next_monday, next_sunday
 
 
+def get_booking_window():
+    """返回可预约的日期范围：下周一到下下周日。"""
+    next_monday, next_sunday = get_next_week_range()
+    window_end = next_sunday + timedelta(days=7)
+    return next_monday, window_end
+
+
 def _check_booking_open():
     """检查当前是否在预约开放时段（周五及之后）。返回 (ok, err_msg)。"""
     if TEST_MODE:
@@ -140,6 +147,7 @@ def get_slots():
     today_str = today.isoformat()
 
     next_monday, next_sunday = get_next_week_range()
+    window_start, window_end = get_booking_window()
 
     # 只在周五及之后放出号源（医生 token / 测试模式可随时预览）
     if not TEST_MODE and today.weekday() < 4:
@@ -187,16 +195,8 @@ def get_slots():
             cur += timedelta(days=1)
         return out
 
-    # 本周日（或今天，取较大者）
-    this_week_start = max(today, today - timedelta(days=today.weekday()))
-    this_week_end = this_week_start + timedelta(days=(6 - this_week_start.weekday()))
-
-    result = {}
-    # 本周：从今天到本周日
-    result.update(build_slots_for_range(this_week_start, this_week_end))
-    # 下周：周一到周日
-    if next_monday > this_week_end:
-        result.update(build_slots_for_range(next_monday, next_sunday))
+    # 下周 + 下下周
+    result = build_slots_for_range(window_start, window_end)
 
     return jsonify({'open': True, 'slots': result})
 
@@ -218,6 +218,18 @@ def lock_slot():
         return jsonify({'ok': False, 'error': '请填写姓名'}), 400
     if time_slot not in TIME_SLOTS:
         return jsonify({'ok': False, 'error': '无效的时间段'}), 400
+
+    # ── 日期范围校验：只能在预约窗口内 ──
+    try:
+        target_date = date.fromisoformat(day)
+    except ValueError:
+        return jsonify({'ok': False, 'error': '无效的日期'}), 400
+    win_start, win_end = get_booking_window()
+    if target_date < win_start or target_date > win_end:
+        return jsonify({
+            'ok': False,
+            'error': f'该日期不在可预约范围（{win_start.isoformat()} ~ {win_end.isoformat()}）'
+        }), 400
 
     # ── IP 防盗刷 ──
     ip = _get_client_ip()
