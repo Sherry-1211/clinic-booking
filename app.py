@@ -105,6 +105,16 @@ def get_next_week_range():
     return next_monday, next_sunday
 
 
+def _check_booking_open():
+    """检查当前是否在预约开放时段（周五及之后）。返回 (ok, err_msg)。"""
+    today = date.today()
+    if today.weekday() < 4:
+        days_to_friday = 4 - today.weekday()
+        friday = today + timedelta(days=days_to_friday)
+        return False, f'下周日源将于 {friday.month}月{friday.day}日（周五）开放，请耐心等待'
+    return True, ''
+
+
 # ── 页面路由 ──
 
 @app.route('/')
@@ -122,11 +132,25 @@ def doctor_page():
 
 @app.route('/api/slots')
 def get_slots():
-    today = date.today().isoformat()
+    today = date.today()
     now = datetime.now()
-    bookings = load_bookings()
+    today_str = today.isoformat()
 
     next_monday, next_sunday = get_next_week_range()
+
+    # 只在周五及之后放出号源
+    if today.weekday() < 4:
+        # 本周五是哪天
+        days_to_friday = 4 - today.weekday()
+        friday = today + timedelta(days=days_to_friday)
+        return jsonify({
+            'open': False,
+            'message': f'下周日源将于 {friday.month}月{friday.day}日（周五）开放',
+            'next_monday': next_monday.isoformat(),
+            'next_sunday': next_sunday.isoformat(),
+        })
+
+    bookings = load_bookings()
 
     result = {}
     current = next_monday
@@ -142,20 +166,20 @@ def get_slots():
             }
             if key in bookings:
                 b = bookings[key]
-                can_cancel = not (day == today and now.hour >= CANCEL_DEADLINE_HOUR)
+                can_cancel = not (day == today_str and now.hour >= CANCEL_DEADLINE_HOUR)
                 slot['status'] = 'booked'
                 slot['booking'] = {
                     'name': b['name'],
                     'questionnaire_done': b.get('questionnaire_done', False),
                     'can_cancel': can_cancel,
                 }
-            elif day < today:
+            elif day < today_str:
                 slot['status'] = 'expired'
             slots.append(slot)
         result[day] = slots
         current += timedelta(days=1)
 
-    return jsonify({'slots': result})
+    return jsonify({'open': True, 'slots': result})
 
 
 @app.route('/api/book/lock', methods=['POST'])
@@ -165,6 +189,11 @@ def lock_slot():
     day = data.get('day', '').strip()
     time_slot = data.get('time_slot', '').strip()
     name = data.get('name', '').strip()
+
+    # 只在周五及之后接受预约
+    if date.today().weekday() < 4:
+        _, err = _check_booking_open()
+        return jsonify({'ok': False, 'error': err}), 403
 
     if not all([day, time_slot, name]):
         return jsonify({'ok': False, 'error': '请填写姓名'}), 400

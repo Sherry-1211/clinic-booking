@@ -359,6 +359,20 @@ async function fetchData() {
   try {
     const res = await fetch('/api/slots');
     const json = await res.json();
+
+    // 号源未开放（周一至周四）
+    if (!json.open) {
+      const msg = json.message || '号源尚未开放';
+      const nextMon = json.next_monday || '';
+      const nextSun = json.next_sunday || '';
+      document.getElementById('date-bar').innerHTML = '';
+      document.getElementById('slot-list').innerHTML =
+        '<div class="empty-state"><div class="ico">🔒</div><p style="font-weight:600;font-size:16px;">' + msg + '</p>' +
+        (nextMon ? '<p style="font-size:12px;color:#86868b;margin-top:4px;">可预约日期：' + nextMon + ' ~ ' + nextSun + '</p>' : '') +
+        '</div>';
+      return;
+    }
+
     allSlots = json.slots || {};
     const days = Object.keys(allSlots).sort();
     if (!activeDay) activeDay = days[0] || '';
