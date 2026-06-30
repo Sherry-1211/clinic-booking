@@ -157,32 +157,46 @@ def get_slots():
 
     bookings = load_bookings()
 
-    result = {}
-    current = next_monday
-    while current <= next_sunday:
-        day = current.isoformat()
-        slots = []
-        for ts in TIME_SLOTS:
-            key = f'{day}_{ts}'
-            slot = {
-                'time': ts,
-                'status': 'available',
-                'booking': None,
-            }
-            if key in bookings:
-                b = bookings[key]
-                can_cancel = not (day == today_str and now.hour >= CANCEL_DEADLINE_HOUR)
-                slot['status'] = 'booked'
-                slot['booking'] = {
-                    'name': b['name'],
-                    'questionnaire_done': b.get('questionnaire_done', False),
-                    'can_cancel': can_cancel,
+    def build_slots_for_range(start_date, end_date):
+        """构建指定日期范围内的时段数据。"""
+        out = {}
+        cur = start_date
+        while cur <= end_date:
+            day = cur.isoformat()
+            slots = []
+            for ts in TIME_SLOTS:
+                key = f'{day}_{ts}'
+                slot = {
+                    'time': ts,
+                    'status': 'available',
+                    'booking': None,
                 }
-            elif day < today_str:
-                slot['status'] = 'expired'
-            slots.append(slot)
-        result[day] = slots
-        current += timedelta(days=1)
+                if key in bookings:
+                    b = bookings[key]
+                    can_cancel = not (day == today_str and now.hour >= CANCEL_DEADLINE_HOUR)
+                    slot['status'] = 'booked'
+                    slot['booking'] = {
+                        'name': b['name'],
+                        'questionnaire_done': b.get('questionnaire_done', False),
+                        'can_cancel': can_cancel,
+                    }
+                elif day < today_str:
+                    slot['status'] = 'expired'
+                slots.append(slot)
+            out[day] = slots
+            cur += timedelta(days=1)
+        return out
+
+    # 本周日（或今天，取较大者）
+    this_week_start = max(today, today - timedelta(days=today.weekday()))
+    this_week_end = this_week_start + timedelta(days=(6 - this_week_start.weekday()))
+
+    result = {}
+    # 本周：从今天到本周日
+    result.update(build_slots_for_range(this_week_start, this_week_end))
+    # 下周：周一到周日
+    if next_monday > this_week_end:
+        result.update(build_slots_for_range(next_monday, next_sunday))
 
     return jsonify({'open': True, 'slots': result})
 

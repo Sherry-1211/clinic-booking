@@ -191,47 +191,6 @@ body {
 .booking-confirm-card .row .label { color: #86868b; }
 .booking-confirm-card .row .val { font-weight: 500; color: #1d1d1f; }
 
-/* 医生管理内嵌样式 */
-.doctor-panel-wrap { padding-bottom: 16px; }
-.dp-day-group { margin-bottom: 20px; }
-.dp-day-label {
-  font-size: 15px; font-weight: 600; margin-bottom: 8px; color: #1d1d1f;
-  display: flex; align-items: center; gap: 6px;
-}
-.dp-day-label .badge {
-  font-size: 12px; background: #0071e3; color: #fff;
-  padding: 1px 8px; border-radius: 20px; font-weight: 500;
-}
-.dp-card {
-  background: #fff; border: 1px solid #e5e5ea; border-radius: 14px;
-  padding: 14px 16px; margin-bottom: 8px;
-}
-.dp-card-header {
-  display: flex; justify-content: space-between; align-items: flex-start;
-  margin-bottom: 10px; padding-bottom: 10px; border-bottom: 1px solid #f0f0f5;
-}
-.dp-time { font-size: 14px; font-weight: 600; color: #0071e3; }
-.dp-name { font-size: 16px; font-weight: 600; }
-.dp-contact { font-size: 12px; color: #86868b; margin-top: 2px; }
-.dp-cancel-btn {
-  font-size: 12px; padding: 5px 12px; border-radius: 8px; cursor: pointer;
-  border: none; background: #fff0f0; color: #ff3b30;
-  -webkit-tap-highlight-color: transparent; white-space: nowrap;
-}
-.dp-cancel-btn:active { background: #ffd6d6; }
-.dp-field { margin-bottom: 6px; font-size: 13px; display: flex; gap: 6px; }
-.dp-field .key { color: #86868b; flex-shrink: 0; min-width: 56px; }
-.dp-field .val { color: #1d1d1f; }
-.dp-first-badge {
-  display: inline-block; font-size: 11px; padding: 2px 8px;
-  border-radius: 20px; margin-bottom: 8px;
-}
-.dp-first-badge.first { background: #e8f4fd; color: #0071e3; }
-.dp-first-badge.revisit { background: #f0f0f5; color: #86868b; }
-.dp-q-undone {
-  background: #fff9ec; border: 1px solid #f0c040; border-radius: 8px;
-  padding: 8px 10px; margin-top: 8px; font-size: 12px; color: #8b6914;
-}
 
 .empty-state { text-align: center; padding: 40px 20px; color: #86868b; }
 .empty-state .ico { font-size: 40px; margin-bottom: 10px; }
@@ -264,18 +223,13 @@ body {
   margin-right: 6px;
 }
 .slot-complete-btn:active { background: #f0f5ff; }
-.doctor-entry-btn {
-  font-size: 13px; color: #86868b; background: #f5f5f7; border: none;
-  border-radius: 8px; padding: 6px 12px; cursor: pointer;
-}
 </style>
 </head>
 <body>
 <div class="container" id="app">
 
   <div class="top-nav">
-    <span class="top-title" id="view-title">张医生义诊预约</span>
-    <button class="doctor-entry-btn" onclick="toggleDoctor()" id="doctor-toggle-btn">医生入口</button>
+    <span class="top-title">张医生义诊预约</span>
   </div>
 
   <div id="resident-view">
@@ -316,12 +270,6 @@ body {
     </div>
   </div>
 
-  <div id="doctor-view" style="display:none;">
-    <div class="doctor-panel-wrap" id="doctor-content">
-      <div class="empty-state"><div class="ico">⏳</div><p>加载中...</p></div>
-    </div>
-  </div>
-
 </div>
 
 <!-- 弹窗 -->
@@ -335,7 +283,6 @@ body {
 const WEEKDAYS = ['周日','周一','周二','周三','周四','周五','周六'];
 let allSlots = {};
 let activeDay = null;
-let isDoctor = false;
 let pendingSlot = null;
 let selectedFirst = null;
 let lockName = '';
@@ -765,124 +712,6 @@ function closeModal() {
 }
 function handleOverlayClick(e) {
   if (e.target === document.getElementById('modal')) closeModal();
-}
-
-/* ========== 医生管理 ========== */
-async function toggleDoctor() {
-  if (isDoctor) {
-    isDoctor = false;
-    document.getElementById('resident-view').style.display = 'block';
-    document.getElementById('doctor-view').style.display = 'none';
-    document.getElementById('doctor-toggle-btn').textContent = '医生入口';
-    document.getElementById('view-title').textContent = '张医生义诊预约';
-    fetchData();
-    return;
-  }
-  document.getElementById('modal').style.display = 'flex';
-  document.getElementById('modal-content').innerHTML = `
-    <div class="modal-handle"></div>
-    <h3>医生管理入口</h3>
-    <div class="modal-sub">请输入管理密码</div>
-    <div class="input-group">
-      <input id="doc-pwd" type="password" placeholder="管理密码" autocomplete="off">
-    </div>
-    <button class="btn btn-primary" onclick="doctorLogin()">进入</button>
-    <button class="btn btn-secondary" onclick="closeModal()">取消</button>
-  `;
-  setTimeout(() => { const el = document.getElementById('doc-pwd'); if(el) el.focus(); }, 300);
-}
-
-async function doctorLogin() {
-  const pwd = document.getElementById('doc-pwd').value.trim();
-  if (!pwd) { showToast('请输入密码', true); return; }
-  try {
-    const res = await fetch(`/api/doctor?t=${encodeURIComponent(pwd)}`);
-    const data = await res.json();
-    if (data.ok) {
-      closeModal();
-      isDoctor = true;
-      document.getElementById('resident-view').style.display = 'none';
-      document.getElementById('doctor-view').style.display = 'block';
-      document.getElementById('doctor-toggle-btn').textContent = '退出管理';
-      document.getElementById('view-title').textContent = '预约管理';
-      renderDoctorView(data.data);
-      doctorPwd = pwd;
-    } else {
-      showToast('密码错误', true);
-    }
-  } catch(e) {
-    showToast('网络错误', true);
-  }
-}
-
-let doctorPwd = '';
-
-function renderDoctorView(bookingData) {
-  const container = document.getElementById('doctor-content');
-  if (!bookingData || bookingData.length === 0) {
-    container.innerHTML = '<div class="empty-state"><div class="ico">📭</div><p>暂无预约记录</p></div>';
-    return;
-  }
-
-  container.innerHTML = bookingData.map(day => {
-    const dt = new Date(day.date + 'T00:00:00');
-    const cards = day.bookings.map(b => {
-      const firstCls = b.is_first === '首诊' ? 'first' : 'revisit';
-      const firstLabel = b.is_first || '';
-      const qDone = b.questionnaire_done;
-      return `<div class="dp-card">
-        <div class="dp-card-header">
-          <div>
-            <div class="dp-time">${b.time}</div>
-            <div class="dp-name">${b.name}</div>
-            ${b.contact ? `<div class="dp-contact">📞 ${b.contact}</div>` : ''}
-          </div>
-          <button class="dp-cancel-btn" onclick="doctorCancel('${day.date}','${b.time}')">取消预约</button>
-        </div>
-        ${firstLabel ? `<span class="dp-first-badge ${firstCls}">${firstLabel}</span>` : ''}
-        ${!qDone ? `<div class="dp-q-undone">⚠️ 诊前问卷待补充</div>` : ''}
-        <div class="dp-field"><span class="key">主诉</span><span class="val">${b.complaint || '—'}</span></div>
-        ${b.duration ? `<div class="dp-field"><span class="key">持续时长</span><span class="val">${b.duration}</span></div>` : ''}
-        ${b.history ? `<div class="dp-field"><span class="key">既往病史</span><span class="val">${b.history}</span></div>` : ''}
-        <div class="dp-field" style="color:#86868b;font-size:11px;margin-top:6px;">预约于 ${b.booked_at}</div>
-      </div>`;
-    }).join('');
-
-    return `<div class="dp-day-group">
-      <div class="dp-day-label">
-        ${day.date}（${WEEKDAYS[dt.getDay()]}）
-        <span class="badge">${day.bookings.length} 人</span>
-      </div>
-      ${cards}
-    </div>`;
-  }).join('');
-}
-
-async function doctorCancel(day, timeSlot) {
-  if (!confirm('确认取消此预约？号源将立即释放。')) return;
-
-  try {
-    const res = await fetch('/api/cancel', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        day, time_slot: timeSlot,
-        t: doctorPwd,
-      })
-    });
-    const data = await res.json();
-    if (data.ok) {
-      showToast(data.message || '已取消，号源已释放', false, true);
-      const r2 = await fetch(`/api/doctor?t=${encodeURIComponent(doctorPwd)}`);
-      const d2 = await r2.json();
-      if (d2.ok) renderDoctorView(d2.data);
-      fetchData();
-    } else {
-      showToast(data.error || '操作失败', true);
-    }
-  } catch(e) {
-    showToast('网络错误', true);
-  }
 }
 
 /* ========== Toast ========== */
